@@ -24,14 +24,18 @@ from rrb3 import *
 rr = RRB3(12, 12)
 
 # Configure two GPIO outputs for grabby hand controls
-GPIO_OUTPUT1 = 17
-GPIO_OUTPUT2 = 18
+GPIO_RELAY1 = 16
+GPIO_RELAY2 = 17
+GPIO_RELAY3 = 18
+GPIO_RELAY4 = 20
 
 # Configure two GPIO outputs
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-GPIO.setup(GPIO_OUTPUT1,GPIO.OUT)
-GPIO.setup(GPIO_OUTPUT2, GPIO.OUT)
+GPIO.setup(GPIO_RELAY1,GPIO.OUT)
+GPIO.setup(GPIO_RELAY2, GPIO.OUT)
+GPIO.setup(GPIO_RELAY3, GPIO.OUT)
+GPIO.setup(GPIO_RELAY4, GPIO.OUT)
 
 # Configure PWM board connected at IC2 address 0x40 (default).
 pwm = PWM(0x40)
@@ -97,33 +101,27 @@ class PiControlServer(BaseHTTPRequestHandler):
 			on = vals[0]
 			dir = vals[1]
 			print('Grabbyhand, on=' + on + " dir=" + dir)
-			failsafe = False
 
 			# Direction controlled by relay state
-			if dir == '1':
-				print('open')
-				GPIO.output(GPIO_OUTPUT1, GPIO.HIGH)
-				GPIO.output(GPIO_OUTPUT2, GPIO.LOW)
-				failsafe = True
-			else:
-				print('close')
-				GPIO.output(GPIO_OUTPUT1, GPIO.LOW)
-				GPIO.output(GPIO_OUTPUT2, GPIO.HIGH)
-				failsafe = True
-
-			# Whether switch on the open collector which is set up as the
-			# overall on/off switch for the hand.
-			if on == GRABBYHAND_ON:
-				if (failsafe):
-					# Set open collector
-					rr.set_oc1(1)
+			if (on == GRABBYHAND_ON):
+				if dir == '1':
+					print('open')
+					GPIO.output(GPIO_RELAY1, GPIO.HIGH)
+					GPIO.output(GPIO_RELAY2, GPIO.LOW)
+					GPIO.output(GPIO_RELAY3, GPIO.HIGH)
+					GPIO.output(GPIO_RELAY4, GPIO.LOW)
 				else:
-					print('WARNING: Attempted to switch on grabby hand without setting direction!')
+					print('close')
+					GPIO.output(GPIO_RELAY1, GPIO.LOW)
+					GPIO.output(GPIO_RELAY2, GPIO.HIGH)
+					GPIO.output(GPIO_RELAY3, GPIO.LOW)
+					GPIO.output(GPIO_RELAY4, GPIO.HIGH)
 			else:
-				GPIO.output(GPIO_OUTPUT1, GPIO.HIGH)
-				GPIO.output(GPIO_OUTPUT2, GPIO.HIGH)
-				rr.set_oc1(0)
-
+				# All low means R1 & R2 closed, R3 & R4 open
+				GPIO.output(GPIO_RELAY1, GPIO.LOW)
+				GPIO.output(GPIO_RELAY2, GPIO.LOW)
+				GPIO.output(GPIO_RELAY3, GPIO.LOW)
+				GPIO.output(GPIO_RELAY4, GPIO.LOW)
 
 		# LED controller parameters on Servo module
 		if (params.has_key('l')):
