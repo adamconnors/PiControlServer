@@ -8,15 +8,17 @@ import urlparse
 from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
 from os import path,getcwd,sep
 
-# Real implementation when running on Raspberry Pi -- comment for local testing
-from Adafruit_PWM_Servo_Driver import PWM
-import RPi.GPIO as GPIO
-from rrb3 import *
-
-# Uncomment this line for local testing
-#from dummylibs import GPIO
-#from dummylibs import PWM
-#from dummylibs import RRB3
+try:
+	# Real implementation when running on Raspberry Pi -- comment for local testing
+	from Adafruit_PWM_Servo_Driver import PWM
+	import RPi.GPIO as GPIO
+	from rrb3 import *
+except:
+	# Fake libraries for running on laptop & testing
+	print '***WARNING*** COULDNT FIND Adafruit, GPIO, or RRB3 libs, using fake ones only. Nothing is gonna happen now.'
+	from dummylibs import GPIO
+	from dummylibs import PWM
+	from dummylibs import RRB3
 
 
 # Configure raspirobot board 12V input & 12V motors
@@ -24,18 +26,22 @@ from rrb3 import *
 rr = RRB3(12, 12)
 
 # Configure two GPIO outputs for grabby hand controls
+# Top side of motor
 GPIO_RELAY1 = 16
+
+# Bottom side of motor
 GPIO_RELAY2 = 17
-GPIO_RELAY3 = 18
-GPIO_RELAY4 = 20
+
+# Overall on/off switch. Connected to NC since default for GPIO is HIGH,
+# so always ensure GPIO state is HIGH (off) before changes RELAY1 or RELAY2
+GPIO_RELAY3_MASTER = 18
 
 # Configure two GPIO outputs
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 GPIO.setup(GPIO_RELAY1,GPIO.OUT)
 GPIO.setup(GPIO_RELAY2, GPIO.OUT)
-GPIO.setup(GPIO_RELAY3, GPIO.OUT)
-GPIO.setup(GPIO_RELAY4, GPIO.OUT)
+GPIO.setup(GPIO_RELAY3_MASTER, GPIO.OUT)
 
 # Configure PWM board connected at IC2 address 0x40 (default).
 pwm = PWM(0x40)
@@ -94,6 +100,24 @@ class PiControlServer(BaseHTTPRequestHandler):
 			# args: left spd, left dir, right spd, right dir
 			rr.set_motors(leftSpeed, leftDirection, rightSpeed, rightDirection)
 
+		# Relay tests
+		if params.has_key('r'):
+			vals = params['r'][0].split(",")
+			relay = vals[0]
+			on = vals[1]
+			gpio = 0
+			if relay == '1':
+				gpio=GPIO_RELAY1
+			elif relay == '2':
+				gpio=GPIO_RELAY2
+			elif relay == '3':
+				gpio=GPIO_RELAY3_MASTER
+
+			if on == '1':
+				GPIO.output(gpio, GPIO.HIGH)
+			else:
+				GPIO.output(gpio, GPIO.LOW)
+
 		# Grabby hand controller parameters
 		# On, Direction
 		if params.has_key('h'):
@@ -106,22 +130,19 @@ class PiControlServer(BaseHTTPRequestHandler):
 			if (on == GRABBYHAND_ON):
 				if dir == '1':
 					print('open')
+					GPIO.output(GPIO_RELAY3_MASTER, GPIO.HIGH)
 					GPIO.output(GPIO_RELAY1, GPIO.HIGH)
 					GPIO.output(GPIO_RELAY2, GPIO.LOW)
-					GPIO.output(GPIO_RELAY3, GPIO.HIGH)
-					GPIO.output(GPIO_RELAY4, GPIO.LOW)
+					GPIO.output(GPIO_RELAY3_MASTER, GPIO.LOW)
 				else:
 					print('close')
+					GPIO.output(GPIO_RELAY3_MASTER, GPIO.HIGH)
 					GPIO.output(GPIO_RELAY1, GPIO.LOW)
 					GPIO.output(GPIO_RELAY2, GPIO.HIGH)
-					GPIO.output(GPIO_RELAY3, GPIO.LOW)
-					GPIO.output(GPIO_RELAY4, GPIO.HIGH)
+					GPIO.output(GPIO_RELAY3_MASTER, GPIO.LOW)
 			else:
-				# All low means R1 & R2 closed, R3 & R4 open
-				GPIO.output(GPIO_RELAY1, GPIO.LOW)
-				GPIO.output(GPIO_RELAY2, GPIO.LOW)
-				GPIO.output(GPIO_RELAY3, GPIO.LOW)
-				GPIO.output(GPIO_RELAY4, GPIO.LOW)
+				print('off')
+				GPIO.output(GPIO_RELAY3_MASTER, GPIO.HIGH)
 
 		# LED controller parameters on Servo module
 		if (params.has_key('l')):
