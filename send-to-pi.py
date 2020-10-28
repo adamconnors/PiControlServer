@@ -16,6 +16,11 @@ scp = SCPClient(ssh.get_transport())
 scp.put('index.html','/home/pi/picontrolserver/.')
 scp.close()
 
+print('copying sound file')
+scp = SCPClient(ssh.get_transport())
+scp.put('rvoice.wav','/home/pi/picontrolserver/.')
+scp.close()
+
 print('ensuring server is down')
 ssh.exec_command('sudo /etc/init.d/picontrolserver stop')
 

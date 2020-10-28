@@ -7,7 +7,7 @@
 
 import urlparse
 from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
-from os import path,getcwd,sep
+from os import path,getcwd,sep, system
 import serial
 import threading
 import time
@@ -73,6 +73,7 @@ SERVO_RANGE = SERVO_MAX - SERVO_MIN
 GRABBYHAND_ON = '1'
 GRABBYHAND_OFF = '0'
 
+USE_SPEAKER_INSTEAD_OF_HAND = True
 
 class Arm(threading.Thread):
 
@@ -246,11 +247,16 @@ class PiControlServer(BaseHTTPRequestHandler):
 			# Direction controlled by relay state
 			if (on == GRABBYHAND_ON):
 				if dir == '1':
-					print('open')
-					GPIO.output(GPIO_RELAY3_MASTER, GPIO.HIGH)
-					GPIO.output(GPIO_RELAY1, GPIO.HIGH)
-					GPIO.output(GPIO_RELAY2, GPIO.LOW)
-					GPIO.output(GPIO_RELAY3_MASTER, GPIO.LOW)
+					if USE_SPEAKER_INSTEAD_OF_HAND:
+						print('speaking...')
+						system('aplay /home/pi/picontrolserver/rvoice.wav')
+					else:
+						print('open')
+						GPIO.output(GPIO_RELAY3_MASTER, GPIO.HIGH)
+						GPIO.output(GPIO_RELAY1, GPIO.HIGH)
+						GPIO.output(GPIO_RELAY2, GPIO.LOW)
+						GPIO.output(GPIO_RELAY3_MASTER, GPIO.LOW)
+
 				else:
 					print('close')
 					GPIO.output(GPIO_RELAY3_MASTER, GPIO.HIGH)
@@ -305,6 +311,10 @@ try:
 	#incoming request
 	server = HTTPServer(('', PORT_NUMBER), PiControlServer)
 	print 'Started httpserver on port ' , PORT_NUMBER
+
+	# Setting audio outpuer
+	system('amixer cset numid=3 1')
+	system('amixer set PCM -- 100%')
 
 	# Start arm driver
 	armState.start()
